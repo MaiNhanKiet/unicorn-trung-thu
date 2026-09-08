@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Heart, MagnifyingGlass, X } from "@phosphor-icons/react";
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   FUND_GOAL,
   LANTERN_ASSETS,
@@ -13,12 +13,22 @@ import {
 } from "@/lib/catalog";
 import { formatVnd, isValidEmail, normalizeEmail } from "@/lib/format";
 import type { Donation } from "@/lib/types";
+import { AnimatedTotal } from "./animated-total";
 import { DonorDialog } from "./donor-dialog";
 import { LanternCarousel3D } from "./lantern-carousel-3d";
 import { useDonations } from "./donation-store";
 
 export function LanternStreet() {
-  const { donations, featuredId, ready, setFeaturedId } = useDonations();
+  const {
+    donations,
+    totalRaised,
+    featuredId,
+    ready,
+    hasMore,
+    loadingMore,
+    loadMoreDonations,
+    setFeaturedId,
+  } = useDonations();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [selected, setSelected] = useState<Donation | null>(null);
@@ -26,6 +36,7 @@ export function LanternStreet() {
   const [lookupEmail, setLookupEmail] = useState("");
   const [lookupError, setLookupError] = useState("");
   const [found, setFound] = useState<Donation[]>([]);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const lookupId = useId();
   const lookupErrorId = useId();
   const tabSkyId = useId();
@@ -40,11 +51,10 @@ export function LanternStreet() {
   );
   const hanging = sorted.slice(0, VISIBLE_LANTERN_LIMIT);
   const mineIds = useMemo(() => new Set(found.map((item) => item.id)), [found]);
-  const total = sorted.reduce((sum, item) => sum + item.amount, 0);
+  const total = totalRaised;
   const brightness = Math.min(1, total / FUND_GOAL);
   const highlightId = featuredId ?? searchParams.get("highlight");
   const featured = hanging.find((item) => item.id === highlightId) ?? null;
-
   useEffect(() => {
     if (!featured) return;
     setViewTab("sky");
@@ -81,12 +91,29 @@ export function LanternStreet() {
     return () => window.clearTimeout(timer);
   }, [found]);
 
+  useEffect(() => {
+    if (viewTab !== "list" || !hasMore) return;
+    const node = loadMoreRef.current;
+    if (!node) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          void loadMoreDonations();
+        }
+      },
+      { root: null, rootMargin: "200px", threshold: 0 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [viewTab, hasMore, loadMoreDonations, sorted.length]);
+
   return (
     <div className="page-shell">
       <div
         className="page-backdrop transition-[filter] duration-700"
         style={{
-          filter: `brightness(${0.78 + brightness * 0.4}) saturate(${0.9 + brightness * 0.3})`,
+          filter: `brightness(${0.78 + brightness * 0.32}) saturate(${0.9 + brightness * 0.25})`,
         }}
       >
         <Image
@@ -101,34 +128,33 @@ export function LanternStreet() {
         <div className="page-veil" />
       </div>
 
-      <section className="relative z-10 mx-auto max-w-3xl px-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6">
-        <div className="glass px-5 py-6 sm:px-7">
-          <p className="eyebrow">Dự án cộng đồng</p>
-          <h1 className="mt-3 text-3xl sm:text-4xl">Đan Tiếng Yêu Thương</h1>
-          <p className="mt-3 font-medium text-[var(--color-gold)]">
-            Gom điều nhỏ bé — Dệt ngàn yêu thương
-          </p>
-          <p className="mt-4 text-[var(--color-muted-foreground)]">
-            Trung Thu không chỉ là mùa của đoàn viên, mà còn là dịp để kết nối, sẻ chia
-            và lan tỏa yêu thương.
-          </p>
+      <section className="relative z-10 mx-auto w-full max-w-5xl px-4 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-6 lg:max-w-6xl">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(260px,0.85fr)] lg:items-stretch">
+          <div className="glass px-5 py-6 sm:px-7 lg:px-8 lg:py-7">
+            <p className="eyebrow">Dự án cộng đồng</p>
+            <h1 className="mt-3 text-3xl text-[var(--color-gold)] sm:text-4xl lg:text-[2.75rem] lg:leading-tight">
+              Đan Tiếng Yêu Thương
+            </h1>
+            <p className="mt-3 font-medium text-[var(--color-teal)]">
+              Gom điều nhỏ bé — Dệt ngàn yêu thương
+            </p>
+            <p className="mt-4 max-w-prose text-[var(--color-muted-foreground)]">
+              Trung Thu không chỉ là mùa của đoàn viên, mà còn là dịp để kết nối, sẻ chia
+              và lan tỏa yêu thương.
+            </p>
+          </div>
+          <header className="glass flex flex-col items-center justify-center px-5 py-5 text-center sm:px-7 lg:px-6">
+            <p className="eyebrow">
+              Tổng tiền hiện tại
+            </p>
+            <AnimatedTotal value={total} ready={ready} />
+          </header>
         </div>
       </section>
 
-      <header className="relative z-10 mx-auto mt-4 max-w-3xl px-4 sm:px-6">
-        <div className="glass px-5 py-4 text-center sm:px-7">
-          <p className="eyebrow" style={{ color: "#fff" }}>
-            Tổng số tiền hiện tại
-          </p>
-          <p className="mt-2 text-3xl font-semibold tabular-nums text-[var(--color-gold)] sm:text-4xl">
-            {ready ? formatVnd(total) : "…"}
-          </p>
-        </div>
-      </header>
-
-      <section className="relative z-10 mx-auto mt-4 max-w-3xl px-4 sm:px-6">
+      <section className="relative z-10 mx-auto mt-4 w-full max-w-5xl px-4 sm:px-6 lg:max-w-6xl">
         <form
-          className="glass px-4 py-4 sm:px-5"
+          className="glass px-4 py-4 sm:px-5 lg:px-6"
           onSubmit={(event) => {
             event.preventDefault();
             const email = normalizeEmail(lookupEmail);
@@ -137,16 +163,34 @@ export function LanternStreet() {
               setFound([]);
               return;
             }
-            const matches = sorted.filter(
-              (item) => normalizeEmail(item.email) === email,
-            );
-            if (matches.length === 0) {
-              setLookupError("Không thấy lồng đèn với email này.");
-              setFound([]);
-              return;
-            }
-            setLookupError("");
-            setFound(matches);
+            void (async () => {
+              try {
+                const response = await fetch(
+                  `/api/donations?email=${encodeURIComponent(email)}`,
+                  { cache: "no-store" },
+                );
+                const data = (await response.json()) as {
+                  donations?: Donation[];
+                  error?: string;
+                };
+                if (!response.ok) {
+                  setLookupError(data.error ?? "Không tìm được.");
+                  setFound([]);
+                  return;
+                }
+                const matches = data.donations ?? [];
+                if (matches.length === 0) {
+                  setLookupError("Không thấy lồng đèn với email này.");
+                  setFound([]);
+                  return;
+                }
+                setLookupError("");
+                setFound(matches);
+              } catch {
+                setLookupError("Mất kết nối. Thử lại.");
+                setFound([]);
+              }
+            })();
           }}
         >
           <label htmlFor={lookupId} className="label find-label">
@@ -200,7 +244,7 @@ export function LanternStreet() {
         </form>
       </section>
 
-      <section className="relative z-10 mx-auto mt-4 w-full max-w-5xl px-4 pb-36 sm:px-6">
+      <section className="relative z-10 mx-auto mt-4 w-full max-w-5xl px-4 pb-36 sm:px-6 lg:max-w-6xl lg:pb-40">
         <div className="street-section">
           <div className="street-tabs" role="tablist" aria-label="Xem phố lồng đèn">
             <button
@@ -280,15 +324,26 @@ export function LanternStreet() {
                 </li>
               ))}
             </ul>
+            {hasMore ? (
+              <div ref={loadMoreRef} className="py-4 text-center text-sm text-[var(--color-muted-foreground)]">
+                {loadingMore ? "Đang tải thêm…" : "Cuộn để xem thêm"}
+              </div>
+            ) : sorted.length > 0 ? (
+              <p className="py-3 text-center text-sm text-[var(--color-muted-foreground)]">
+                Đã hết danh sách
+              </p>
+            ) : null}
           </div>
         </div>
       </section>
 
       <div className="donate-bar">
-        <Link href="/donate" className="btn-primary w-full justify-center">
-          <Heart size={20} weight="fill" aria-hidden="true" />
-          Quyên góp — thắp một lồng đèn
-        </Link>
+        <div className="donate-bar__inner">
+          <Link href="/donate" className="btn-primary w-full justify-center">
+            <Heart size={20} weight="fill" aria-hidden="true" />
+            Quyên Góp
+          </Link>
+        </div>
       </div>
 
       <DonorDialog donation={selected} onClose={() => setSelected(null)} />

@@ -154,8 +154,12 @@ export async function markPaymentCancelled(id: string) {
     where id = ${id}::uuid and status = 'pending'
     returning *
   `;
-  if (rows[0]) return mapPayment(rows[0]);
-  return getPayment(id);
+  const payment = rows[0] ? mapPayment(rows[0]) : await getPayment(id);
+  if (payment) {
+    const { publishPaymentStatus } = await import("@/lib/payment-events");
+    publishPaymentStatus(payment.id, payment.status);
+  }
+  return payment;
 }
 
 export async function upsertDonationFromPayment(payment: PaymentRecord) {
@@ -186,16 +190,51 @@ export async function upsertDonationFromPayment(payment: PaymentRecord) {
 }
 
 export async function completePaymentIfPending(payment: PaymentRecord) {
-  if (payment.status === "paid") {
-    await upsertDonationFromPayment(payment);
+  if (payment.status !== "pending" && payment.status !== "paid") {
     return payment;
   }
-  if (payment.status !== "pending") return payment;
 
-  const paid = await markPaymentPaid(payment.id);
-  if (!paid) return payment;
-  await upsertDonationFromPayment(paid);
+  const rows = await sql<{ data: CompletePaymentResult }[]>`
+    select public.complete_payment_and_enqueue(${payment.id}::uuid) as data
+  `;
+  const data = rows[0]?.data;
+  if (!data?.payment) {
+    throw new Error("Không hoàn tất được thanh toán.");
+  }
+
+  const paid = mapPayment(data.payment);
+
+  const { publishPaymentStatus } = await import("@/lib/payment-events");
+  publishPaymentStatus(paid.id, "paid");
+  const { publishCurrentTotals } = await import("@/lib/total-events");
+  await publishCurrentTotals();
+
+  // Chỉ kick worker khi có job mới trong queue (không gửi SMTP trong request).
+  if (data.queued_msg_id != null) {
+    const { kickThankYouEmailWorker } = await import("@/lib/mail-worker");
+    kickThankYouEmailWorker();
+  }
+
   return paid;
+}
+
+type CompletePaymentResult = {
+  newly_paid?: boolean;
+  queued_msg_id?: number | null;
+  payment: PaymentRow;
+};
+
+export async function getDonationsTotals() {
+  const rows = await sql<{ total: number; count: number }[]>`
+    select
+      coalesce(sum(amount), 0)::int as total,
+      count(*)::int as count
+    from donations
+  `;
+  return {
+    total: rows[0]?.total ?? 0,
+    count: rows[0]?.count ?? 0,
+  };
 }
 
 export async function listDonations() {
@@ -203,6 +242,27 @@ export async function listDonations() {
     select * from donations order by created_at desc
   `;
   return rows.map(mapDonation);
+}
+
+export async function listDonationsPage(limit: number, offset: number) {
+  const safeLimit = Math.min(Math.max(limit, 1), 50);
+  const safeOffset = Math.max(offset, 0);
+  const [rows, totals] = await Promise.all([
+    sql<DonationRow[]>`
+      select * from donations
+      order by created_at desc
+      limit ${safeLimit}
+      offset ${safeOffset}
+    `,
+    getDonationsTotals(),
+  ]);
+  const donations = rows.map(mapDonation);
+  return {
+    donations,
+    total: totals.total,
+    count: totals.count,
+    hasMore: safeOffset + donations.length < totals.count,
+  };
 }
 
 export async function findDonationsByEmail(email: string) {

@@ -7,7 +7,13 @@ import { ArrowLeft, Minus, Plus } from "@phosphor-icons/react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useId, useMemo, useState } from "react";
+import { FormEvent, useEffect, useId, useMemo, useState } from "react";
+import {
+  clearPendingPaymentId,
+  getPendingPaymentId,
+  resolvePendingPaymentId,
+  setPendingPaymentId,
+} from "@/lib/pending-payment";
 
 const EMPTY: Record<ProductId, number> = {
   "nuoc-sam": 0,
@@ -30,12 +36,29 @@ export function DonateForm() {
     submit?: string;
   }>({});
   const [submitting, setSubmitting] = useState(false);
+  const [restoring, setRestoring] = useState(true);
   const emailId = useId();
   const nameId = useId();
   const messageId = useId();
   const emailErrorId = useId();
   const nameErrorId = useId();
   const itemsErrorId = useId();
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const pendingId = await resolvePendingPaymentId();
+      if (cancelled) return;
+      if (pendingId) {
+        router.replace(`/donate/pay?paymentId=${pendingId}`);
+        return;
+      }
+      setRestoring(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const items = useMemo<CartLine[]>(
     () =>
@@ -82,6 +105,18 @@ export function DonateForm() {
     setErrors({});
     setSubmitting(true);
     try {
+      const oldPendingId = getPendingPaymentId();
+      if (oldPendingId) {
+        try {
+          await fetch(`/api/payments/${oldPendingId}/cancel`, {
+            method: "POST",
+          });
+        } catch {
+          /* vẫn cho tạo đơn mới */
+        }
+        clearPendingPaymentId();
+      }
+
       const response = await fetch("/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -100,6 +135,7 @@ export function DonateForm() {
         setErrors({ submit: data.error ?? "Không tạo được mã QR. Thử lại." });
         return;
       }
+      setPendingPaymentId(data.paymentId);
       router.push(`/donate/pay?paymentId=${data.paymentId}`);
     } catch {
       setErrors({ submit: "Mất kết nối. Thử lại sau." });
@@ -120,15 +156,20 @@ export function DonateForm() {
         />
         <div className="page-veil" />
       </div>
-      <div className="relative z-10 mx-auto max-w-lg px-4 pb-[calc(8.75rem+env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
+      {restoring ? (
+        <div className="relative z-10 mx-auto max-w-lg px-4 pt-[max(1.25rem,env(safe-area-inset-top))]">
+          <p aria-live="polite">Đang mở đơn thanh toán đang chờ…</p>
+        </div>
+      ) : (
+        <div className="relative z-10 mx-auto max-w-lg px-4 pb-[calc(8.75rem+env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] lg:max-w-4xl lg:px-6">
         <Link href="/" className="soft-link">
           <ArrowLeft size={20} aria-hidden="true" />
           Về Đan Tiếng Yêu Thương
         </Link>
-        <div className="glass mt-4 px-5 py-6">
+        <div className="glass mt-4 px-5 py-6 lg:px-8 lg:py-7">
           <p className="eyebrow">Đan Tiếng Yêu Thương</p>
           <h1 className="mt-3 text-3xl sm:text-4xl">Chọn món bạn muốn gửi</h1>
-          <p className="mt-3 text-[var(--color-muted-foreground)]">
+          <p className="mt-3 max-w-prose text-[var(--color-muted-foreground)]">
             Thanh toán VietQR qua PayOS. Sau khi chuyển khoản, lồng đèn sẽ được
             thắp trên phố.
           </p>
@@ -148,21 +189,21 @@ export function DonateForm() {
             <legend className="text-xl font-semibold">
               Món bán gây quỹ <span className="req-star">*</span>
             </legend>
-            <ul className="mt-3 space-y-3">
+            <ul className="mt-3 grid gap-3 lg:grid-cols-3">
               {PRODUCTS.map((product, index) => {
                 const lantern = Object.values(LANTERN_ASSETS)[index % 4];
                 const quantity = qty[product.id];
                 return (
                   <li
                     key={product.id}
-                    className={`card flex items-center gap-3 ${quantity > 0 ? "is-selected" : ""}`}
+                    className={`card flex items-center gap-3 lg:flex-col lg:items-stretch lg:text-center ${quantity > 0 ? "is-selected" : ""}`}
                   >
                     <Image
                       src={lantern.src}
                       alt=""
                       width={56}
                       height={56}
-                      className="pixel-sprite h-14 w-14 object-contain"
+                      className="pixel-sprite h-14 w-14 object-contain lg:mx-auto lg:h-16 lg:w-16"
                       unoptimized
                     />
                     <div className="min-w-0 flex-1">
@@ -174,7 +215,7 @@ export function DonateForm() {
                         {formatVnd(product.price)}
                       </p>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 lg:justify-center">
                       <button
                         type="button"
                         className="btn-icon"
@@ -211,7 +252,7 @@ export function DonateForm() {
             ) : null}
           </fieldset>
 
-          <div className="space-y-4">
+          <div className="grid gap-4 lg:grid-cols-2">
             <div>
               <label htmlFor={emailId} className="label">
                 Email <span className="req-star">*</span>
@@ -275,7 +316,7 @@ export function DonateForm() {
                 </p>
               ) : null}
             </div>
-            <div>
+            <div className="lg:col-span-2">
               <label htmlFor={messageId} className="label">
                 Lời nhắn
               </label>
@@ -319,6 +360,7 @@ export function DonateForm() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

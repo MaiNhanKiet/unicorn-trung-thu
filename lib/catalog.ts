@@ -1,22 +1,30 @@
 import type { LanternKind, Product, ProductId } from "./types";
 
+function priceFromEnv(envKey: string, fallback: number) {
+  const raw = process.env[envKey]?.trim();
+  if (!raw) return fallback;
+  const value = Number(raw.replace(/[_\s,.]/g, ""));
+  if (!Number.isFinite(value) || value <= 0) return fallback;
+  return Math.round(value);
+}
+
 export const PRODUCTS: Product[] = [
   {
     id: "nuoc-sam",
     name: "Nước Sâm",
-    price: 15_000,
+    price: priceFromEnv("NEXT_PUBLIC_PRICE_NUOC_SAM", 15_000),
     blurb: "Mát lạnh, gửi một ngụm ngọt vào phố đêm.",
   },
   {
     id: "banh-trang",
     name: "Bánh Tráng",
-    price: 15_000,
+    price: priceFromEnv("NEXT_PUBLIC_PRICE_BANH_TRANG", 15_000),
     blurb: "Giòn rụm, thêm một ánh đèn trên phố.",
   },
   {
     id: "com-chay",
     name: "Cơm cháy",
-    price: 20_000,
+    price: priceFromEnv("NEXT_PUBLIC_PRICE_COM_CHAY", 20_000),
     blurb: "Nóng giòn, thắp sáng thêm một lồng đèn.",
   },
 ];
