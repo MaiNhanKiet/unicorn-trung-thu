@@ -9,10 +9,13 @@ import { PRODUCT_MAP } from "@/lib/catalog";
 import { formatVnd } from "@/lib/format";
 import { clearPendingPaymentId } from "@/lib/pending-payment";
 import type { CartLine, PaymentStatus } from "@/lib/types";
+import { PageLoading } from "./page-loading";
+import { SuccessSkeleton } from "./page-skeletons";
 import { useDonations } from "./donation-store";
 
 type PaidOrder = {
   paymentId: string;
+  donationId?: string | null;
   orderCode: number;
   amount: number;
   status: PaymentStatus;
@@ -66,8 +69,9 @@ function PaymentSuccessContent() {
     setConfirming(true);
     try {
       await refreshDonations();
-      setFeaturedId(order.paymentId);
-      router.replace(`/?highlight=${order.paymentId}`);
+      const highlightId = order.donationId || order.paymentId;
+      setFeaturedId(highlightId);
+      router.replace(`/?highlight=${highlightId}`);
     } catch {
       setError("Đã nhận đơn nhưng chưa mở được phố đèn.");
       setConfirming(false);
@@ -81,6 +85,24 @@ function PaymentSuccessContent() {
           Về trang chủ
         </Link>
       </p>
+    );
+  }
+
+  if (!order && !error) {
+    return (
+      <div className="page-shell min-h-dvh">
+        <div className="page-backdrop">
+          <Image
+            src="/image/street-night.png"
+            alt=""
+            fill
+            sizes="100vw"
+            className="pixel-sprite opacity-50"
+          />
+          <div className="page-veil" />
+        </div>
+        <PageLoading label="Đang xác nhận thanh toán…" />
+      </div>
     );
   }
 
@@ -175,8 +197,6 @@ function PaymentSuccessContent() {
                 {confirming ? "Đang mở…" : "Về trang chủ"}
               </button>
             </div>
-          ) : !error ? (
-            <p className="text-center">Đang tải đơn hàng…</p>
           ) : null}
         </div>
       </div>
@@ -186,7 +206,7 @@ function PaymentSuccessContent() {
 
 export function PaymentSuccess() {
   return (
-    <Suspense fallback={<p className="p-6">Đang mở đơn thành công…</p>}>
+    <Suspense fallback={<SuccessSkeleton />}>
       <PaymentSuccessContent />
     </Suspense>
   );

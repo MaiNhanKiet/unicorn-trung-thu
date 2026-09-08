@@ -134,3 +134,33 @@ export async function getAdminSession(): Promise<AdminUser | null> {
   if (!token) return null;
   return decodeSession(token);
 }
+
+export async function changeAdminPassword(
+  adminId: string,
+  currentPassword: string,
+  newPassword: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const rows = await sql<AdminRow[]>`
+    select id, username, password_hash
+    from admins
+    where id = ${adminId}::uuid
+    limit 1
+  `;
+  const admin = rows[0];
+  if (!admin) {
+    return { ok: false, error: "Không tìm thấy tài khoản." };
+  }
+  if (!verifyPassword(currentPassword, admin.password_hash)) {
+    return { ok: false, error: "Mật khẩu hiện tại không đúng." };
+  }
+
+  await sql`
+    update admins
+    set
+      password_hash = ${hashPassword(newPassword)},
+      updated_at = now()
+    where id = ${adminId}::uuid
+  `;
+
+  return { ok: true };
+}

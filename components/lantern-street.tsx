@@ -16,6 +16,7 @@ import type { Donation } from "@/lib/types";
 import { AnimatedTotal } from "./animated-total";
 import { DonorDialog } from "./donor-dialog";
 import { LanternCarousel3D } from "./lantern-carousel-3d";
+import { HomeSkeleton } from "./page-skeletons";
 import { useDonations } from "./donation-store";
 
 export function LanternStreet() {
@@ -107,6 +108,10 @@ export function LanternStreet() {
     observer.observe(node);
     return () => observer.disconnect();
   }, [viewTab, hasMore, loadMoreDonations, sorted.length]);
+
+  if (!ready) {
+    return <HomeSkeleton />;
+  }
 
   return (
     <div className="page-shell">
@@ -339,8 +344,13 @@ export function LanternStreet() {
 
       <div className="donate-bar">
         <div className="donate-bar__inner">
-          <Link href="/donate" className="btn-primary w-full justify-center">
-            <Heart size={20} weight="fill" aria-hidden="true" />
+          <Link href="/donate" className="btn-primary donate-cta w-full justify-center">
+            <Heart
+              className="donate-cta__heart"
+              size={20}
+              weight="fill"
+              aria-hidden="true"
+            />
             Quyên Góp
           </Link>
         </div>

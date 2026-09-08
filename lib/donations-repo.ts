@@ -163,30 +163,16 @@ export async function markPaymentCancelled(id: string) {
 }
 
 export async function upsertDonationFromPayment(payment: PaymentRecord) {
-  const rows = await sql<DonationRow[]>`
-    insert into donations (
-      id, payment_id, email, name, message, amount, items, lantern, created_at
-    ) values (
-      ${payment.id},
-      ${payment.id}::uuid,
-      ${payment.email},
-      ${payment.name},
-      ${payment.message},
-      ${payment.amount},
-      ${sql.json(payment.items)},
-      ${payment.lantern},
-      now()
-    )
-    on conflict (payment_id) do update set
-      email = excluded.email,
-      name = excluded.name,
-      message = excluded.message,
-      amount = excluded.amount,
-      items = excluded.items,
-      lantern = excluded.lantern
-    returning *
-  `;
-  return mapDonation(rows[0]!);
+  // Luồng chính dùng complete_payment_and_enqueue (cộng dồn theo email).
+  // Giữ hàm này cho tương thích gọi cũ: ủy quyền sang complete.
+  return completePaymentIfPending(payment).then(async () => {
+    const id = await findDonationIdByEmail(payment.email);
+    if (!id) throw new Error("Không tìm thấy lồng đèn sau thanh toán.");
+    const rows = await sql<DonationRow[]>`
+      select * from donations where id = ${id} limit 1
+    `;
+    return mapDonation(rows[0]!);
+  });
 }
 
 export async function completePaymentIfPending(payment: PaymentRecord) {
@@ -221,8 +207,30 @@ export async function completePaymentIfPending(payment: PaymentRecord) {
 type CompletePaymentResult = {
   newly_paid?: boolean;
   queued_msg_id?: number | null;
+  donation_id?: string | null;
   payment: PaymentRow;
 };
+
+export async function findDonationIdByEmail(email: string) {
+  const normalized = email.trim().toLowerCase();
+  const rows = await sql<{ id: string }[]>`
+    select id from donations
+    where lower(email) = ${normalized}
+    limit 1
+  `;
+  return rows[0]?.id ?? null;
+}
+
+export async function listPaidPaymentsByEmail(email: string) {
+  const normalized = email.trim().toLowerCase();
+  const rows = await sql<PaymentRow[]>`
+    select * from payments
+    where lower(email) = ${normalized}
+      and status = 'paid'
+    order by created_at desc
+  `;
+  return rows.map(mapPayment);
+}
 
 export async function getDonationsTotals() {
   const rows = await sql<{ total: number; count: number }[]>`

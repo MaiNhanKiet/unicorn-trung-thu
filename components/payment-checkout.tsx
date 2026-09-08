@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, QrCode } from "@phosphor-icons/react";
+import { ArrowLeft, DownloadSimple, QrCode } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { formatVnd } from "@/lib/format";
 import {
@@ -12,6 +12,7 @@ import {
   setPendingPaymentId,
 } from "@/lib/pending-payment";
 import type { PaymentStatus } from "@/lib/types";
+import { PageLoading } from "./page-loading";
 import { useDonations } from "./donation-store";
 
 type PaymentView = {
@@ -45,6 +46,7 @@ export function PaymentCheckout() {
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(Boolean(paymentIdParam));
   const [cancelling, setCancelling] = useState(false);
+  const [downloadingQr, setDownloadingQr] = useState(false);
 
   useEffect(() => {
     if (paymentIdParam) {
@@ -164,8 +166,50 @@ export function PaymentCheckout() {
     }
   }
 
+  async function downloadQr() {
+    if (!paymentId || !payment || downloadingQr) return;
+    setDownloadingQr(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/payments/${paymentId}/qr`, {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw new Error("Không tải được mã QR.");
+      }
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const ext = blob.type.includes("png") ? "png" : "jpg";
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = `vietqr-don-${payment.orderCode}.${ext}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Không tải được mã QR.");
+    } finally {
+      setDownloadingQr(false);
+    }
+  }
+
   if (!ready) {
-    return <p className="p-6">Đang tải…</p>;
+    return (
+      <div className="page-shell min-h-dvh">
+        <div className="page-backdrop">
+          <Image
+            src="/image/street-night.png"
+            alt=""
+            fill
+            sizes="100vw"
+            className="pixel-sprite opacity-50"
+          />
+          <div className="page-veil" />
+        </div>
+        <PageLoading label="Đang tải thanh toán…" />
+      </div>
+    );
   }
 
   if (!paymentId) {
@@ -253,6 +297,15 @@ export function PaymentCheckout() {
                     height={280}
                     className="mx-auto mt-5 rounded-2xl bg-[#fff8ed] p-3"
                   />
+                  <button
+                    type="button"
+                    className="btn-icon mx-auto mt-4 gap-2 px-5"
+                    onClick={() => void downloadQr()}
+                    disabled={downloadingQr}
+                  >
+                    <DownloadSimple size={18} weight="bold" aria-hidden="true" />
+                    {downloadingQr ? "Đang tải…" : "Tải mã QR"}
+                  </button>
                   <p className="mt-4 text-sm text-[var(--color-muted-foreground)]">
                     Đang chờ thanh toán…
                   </p>

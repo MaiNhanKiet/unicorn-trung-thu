@@ -14,6 +14,7 @@ import {
   resolvePendingPaymentId,
   setPendingPaymentId,
 } from "@/lib/pending-payment";
+import { PageLoading } from "@/components/page-loading";
 
 const EMPTY: Record<ProductId, number> = {
   "nuoc-sam": 0,
@@ -157,9 +158,7 @@ export function DonateForm() {
         <div className="page-veil" />
       </div>
       {restoring ? (
-        <div className="relative z-10 mx-auto max-w-lg px-4 pt-[max(1.25rem,env(safe-area-inset-top))]">
-          <p aria-live="polite">Đang mở đơn thanh toán đang chờ…</p>
-        </div>
+        <PageLoading label="Đang kiểm tra đơn thanh toán…" />
       ) : (
         <div className="relative z-10 mx-auto max-w-lg px-4 pb-[calc(8.75rem+env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] lg:max-w-4xl lg:px-6">
         <Link href="/" className="soft-link">

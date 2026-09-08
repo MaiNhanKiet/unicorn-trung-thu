@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
+import { PasswordField } from "@/components/password-field";
 
 export function AdminLoginForm() {
   const router = useRouter();
@@ -64,10 +65,8 @@ export function AdminLoginForm() {
       <label htmlFor={passwordId} className="label mt-4">
         Mật khẩu
       </label>
-      <input
+      <PasswordField
         id={passwordId}
-        className="field"
-        type="password"
         name="password"
         autoComplete="current-password"
         value={password}
