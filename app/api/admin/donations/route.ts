@@ -5,6 +5,7 @@ import {
   requireAdminApi,
   type AdminSortKey,
   type MailFilter,
+  type VisibilityFilter,
 } from "@/lib/admin-donations";
 
 export const runtime = "nodejs";
@@ -31,6 +32,12 @@ export async function GET(request: Request) {
   const mailFilter = (
     ["all", "sent", "pending"].includes(mailRaw) ? mailRaw : "all"
   ) as MailFilter;
+  const visibilityRaw = url.searchParams.get("visibility") ?? "all";
+  const visibility = (
+    ["all", "visible", "hidden"].includes(visibilityRaw)
+      ? visibilityRaw
+      : "all"
+  ) as VisibilityFilter;
   const sortRaw = url.searchParams.get("sort") ?? "createdAt";
   const sort = (SORT_KEYS.has(sortRaw as AdminSortKey)
     ? sortRaw
@@ -45,6 +52,7 @@ export async function GET(request: Request) {
         pageSize: Number.isFinite(pageSize) ? pageSize : 20,
         search,
         mailFilter,
+        visibility,
         sort,
         sortDir,
       }),

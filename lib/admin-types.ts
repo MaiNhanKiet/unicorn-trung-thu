@@ -11,6 +11,7 @@ export type AdminDonationRow = {
   lantern: string;
   createdAt: number;
   thankYouEmailSentAt: number | null;
+  hiddenAt: number | null;
 };
 
 export type AdminSortKey =
@@ -21,6 +22,10 @@ export type AdminSortKey =
   | "mailSent";
 
 export type MailFilter = "all" | "sent" | "pending";
+
+export type VisibilityFilter = "all" | "visible" | "hidden";
+
+export type PaymentStatusFilter = "all" | "pending" | "paid" | "cancelled";
 
 export type ProductSoldStat = {
   productId: ProductId | string;

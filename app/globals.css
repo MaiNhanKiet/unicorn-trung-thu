@@ -1131,6 +1131,33 @@ a:focus-visible {
   gap: 0.55rem;
 }
 
+.admin-manage-toolbar {
+  align-items: end;
+}
+
+@media (min-width: 900px) {
+  .admin-manage-toolbar {
+    grid-template-columns: minmax(16rem, 1.8fr) 9.5rem 8.5rem;
+  }
+}
+
+.admin-manage-items {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.admin-manage-item {
+  display: grid;
+  grid-template-columns: 1fr 7rem;
+  gap: 0.65rem;
+  align-items: center;
+  font-size: 0.92rem;
+}
+
+.admin-manage-item .field {
+  min-height: 44px;
+}
+
 .admin-badge.is-processing {
   border: 1px solid rgba(106, 175, 174, 0.45);
   color: var(--color-teal);

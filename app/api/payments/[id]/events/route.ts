@@ -106,6 +106,13 @@ export async function GET(
         return;
       }
 
+      // Đồng bộ PayOS ngay khi mở SSE (user có thể vừa CK xong / webhook chậm).
+      void syncFromPayOS(id).then((current) => {
+        if (!current) return;
+        send(snapshot(current));
+        if (current.status !== "pending") close();
+      });
+
       unsubscribe = subscribePaymentStatus(id, (event) => {
         if (event.type !== "status" || !event.status) return;
         void getPayment(id).then((current) => {
@@ -139,7 +146,7 @@ export async function GET(
             close();
           }
         });
-      }, 15_000);
+      }, 8_000);
 
       request.signal.addEventListener("abort", close);
     },

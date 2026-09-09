@@ -10,6 +10,8 @@ import type { AdminSortKey, MailFilter } from "@/lib/admin-types";
 import type { CartLine } from "@/lib/types";
 import { formatVnd } from "@/lib/format";
 import { PasswordField } from "@/components/password-field";
+import { AdminManageDonationsPanel } from "@/components/admin-manage-donations";
+import { AdminManagePaymentsPanel } from "@/components/admin-manage-payments";
 
 type DonationRow = {
   id: string;
@@ -22,6 +24,7 @@ type DonationRow = {
   lantern: string;
   createdAt: number;
   thankYouEmailSentAt: number | null;
+  hiddenAt?: number | null;
 };
 
 type ProductSold = {
@@ -644,7 +647,9 @@ function MailQueuePanel({ active }: { active: boolean }) {
 
 export function AdminDashboard({ username }: { username: string }) {
   const router = useRouter();
-  const [tab, setTab] = useState<"donations" | "queue">("donations");
+  const [tab, setTab] = useState<
+    "donations" | "manage" | "payments" | "queue"
+  >("donations");
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -835,6 +840,24 @@ export function AdminDashboard({ username }: { username: string }) {
         <button
           type="button"
           role="tab"
+          aria-selected={tab === "manage"}
+          className={`admin-tab${tab === "manage" ? " is-active" : ""}`}
+          onClick={() => setTab("manage")}
+        >
+          Quản lý donation
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "payments"}
+          className={`admin-tab${tab === "payments" ? " is-active" : ""}`}
+          onClick={() => setTab("payments")}
+        >
+          Quản lý payment
+        </button>
+        <button
+          type="button"
+          role="tab"
           aria-selected={tab === "queue"}
           className={`admin-tab${tab === "queue" ? " is-active" : ""}`}
           onClick={() => setTab("queue")}
@@ -844,6 +867,8 @@ export function AdminDashboard({ username }: { username: string }) {
       </div>
 
       {tab === "queue" ? <MailQueuePanel active /> : null}
+      {tab === "manage" ? <AdminManageDonationsPanel active /> : null}
+      {tab === "payments" ? <AdminManagePaymentsPanel active /> : null}
 
       {tab === "donations" ? (
       <div className="glass admin-panel">

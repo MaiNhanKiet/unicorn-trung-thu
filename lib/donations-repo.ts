@@ -238,6 +238,7 @@ export async function getDonationsTotals() {
       coalesce(sum(amount), 0)::int as total,
       count(*)::int as count
     from donations
+    where hidden_at is null
   `;
   return {
     total: rows[0]?.total ?? 0,
@@ -247,7 +248,9 @@ export async function getDonationsTotals() {
 
 export async function listDonations() {
   const rows = await sql<DonationRow[]>`
-    select * from donations order by created_at desc
+    select * from donations
+    where hidden_at is null
+    order by created_at desc
   `;
   return rows.map(mapDonation);
 }
@@ -258,6 +261,7 @@ export async function listDonationsPage(limit: number, offset: number) {
   const [rows, totals] = await Promise.all([
     sql<DonationRow[]>`
       select * from donations
+      where hidden_at is null
       order by created_at desc
       limit ${safeLimit}
       offset ${safeOffset}
@@ -278,6 +282,7 @@ export async function findDonationsByEmail(email: string) {
   const rows = await sql<DonationRow[]>`
     select * from donations
     where lower(email) = ${normalized}
+      and hidden_at is null
     order by created_at desc
   `;
   return rows.map(mapDonation);
